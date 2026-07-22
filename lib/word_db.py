@@ -1340,10 +1340,6 @@ class WordDB(Template):
         if not isinstance(self.db[wlength]['x'][x][y]['data'], list):
             self.db[wlength]['x'][x][y]['data'] = []
         self.db[wlength]['x'][x][y]['data'].append(val)
-        if x==11 and y==1:
-            print()
-            print(ID, "word_db:1344", self.db[wlength]['x'][x][y]['data'])
-            print()
         
     def set_value(self,wlength,x,y,ID,val):
         # Operate with digits
