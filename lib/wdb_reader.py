@@ -7,23 +7,30 @@ from word_db import WordDB
 import nwmapper
 
 # -------------------------------
-# Create matricers of k-mers
+# Create matricers of k-mers from multiple WDB files
 # -------------------------------
-def create_kmer_matrices(input_folder, output_folder, min_k=4, max_k=12):
+def create_kmer_matrices(
+        input_folder: str, 
+        output_folder: str, 
+        min_k: int = 0, 
+        max_k: int = 0,
+        output_file: str = "",
+        label_taxon: str = "",                      # '' | species | genus
+        data_type: str = "digit",                   # digit | count | z-score
+        digit_map: list = [-2, -1, 1, 2],           # four member list, aplicable for datatype 'digit' to transform '000', '001', '011', '111' to numbers
+        matrix_geometry: str = "lower",             # whole | upper | lower
+        flg_matrix_per_k: bool = False
+    ): 
+    # Matrix geometry: whole | upper | lower
+    # label_taxon add 'Label' column with 'species' or 'genus' names
     # Check if the input folder contains WDB files
     wdb_files = [fn for fn in os.listdir(input_folder) if fn.endswith(".wdb")]
     if not len(wdb_files):
         return (False, f"folder {input_folder} does not contain WDB files")
-        
-    oKmerGenerator = nwmapper.Mapper()
-    value_decoder = {
-        "000" : -2,
-        "001" : -1,
-        "011" : 1,
-        "111" : 2
-    }
-    
+
     file_references = []    # Locations of genomes with accession numbers in different WDB files: [[accession, file_name], ...]
+    # Holder for records from multiple WDB files
+    oWDB = WordDB(min_k=min_k, max_k=max_k)
     
     # Cycle through WDB files
     for wdb_file in wdb_files:
@@ -31,94 +38,43 @@ def create_kmer_matrices(input_folder, output_folder, min_k=4, max_k=12):
         oDB = openDBFile(os.path.join(input_folder, wdb_file))
         if oDB == None:
             continue
-
-        # Matrix geometry: whole | upper | lower
-        matrix_geometry = oDB.matrix_geometry
         
-        print(f"{wdb_file}, {len(oDB.genomes['genomes'])} genomes")
-        file_references += [[acc, wdb_file] for acc in oDB.get_accessions()]
+        print(f"{wdb_file}, {len(oDB)} genomes")
+        file_references += [[acc, wdb_file] for acc in oDB.get_titles()]
 
-        # Extract data from WDB object
-        '''
-        data = oDB.export_db()
-        data = {
-            "info":"info",
-            "genomes":[{'lineage': 'Archaea|Fervidicoccales|Fervidicoccus|Fervidicoccus|NC_017461.1', 
-                'accession': 'NC_017461.1', 'ID': 1, 'seqlength': 1319206, 
-                'source': " 'input/chromosomes/Archaea/Fervidicoccales/Fervidicoccus/Fervidicoccus/NC_017461.1.gbk'"}, ...],
-            "title":"title",
-            "version":"version",
-            "date":"date",
-            "matrix_geometry":"lower | upper | whole",
-            "values":[['001', '111', '011', ...],...],    # Number of lists = number of words, number of values per list = number of genomes
-            "words":[{'word': 'TTTTTTTT', 'length': '8', 'x': '1', 'y': '171', 'index': '0'}, ...]     # Multiple records, should be added to MongoDB by chanks
-                                                                                                       # Words can be accessed by length-x-y combinations or by their indices
-        }
-        '''
-        
-        data = oDB.export_db(min_k, max_k - 1)
-        words = [w for w in data["words"]]
-        matrix_sizes = dict(zip(range(min_k, max_k), [len([w for w in data['words'] if int(w['length']) == k]) for k in range(min_k, max_k)]))
-
-        if len(data['genomes']) > 1:
-            # Sort genomes by ID
-            data['genomes'].sort(key=lambda d: int(d['ID']))
-        
-        # Transpose 'values' from [words][genomes] to [genomes][words]
-        # "values":[['001', '111', '011', ...],...],    # Number of lists = number of genomes, number of values per list = number of words
-        # data['values'] = tools.transpose_list(data['values'])
-        data['values'] = tools.transpose_list(data['values'])
-
-        # Cycle through kmers of different lengths
-        for k in range(min_k, max_k):
-            output_file = os.path.join(output_folder, f"{k}_mers.csv")    
+        # By defaut the holder database take ranges of the first open file
+        if oWDB.min_k == 0:
+            oWDB.min_k = oDB.min_k
+        if oWDB.max_k == 0:
+            oWDB.max_k = oDB.max_k
+        # Check k-mer range compliance
+        # Requested k-mer range must be within the range of WDB files
+        if oWDB.min_k < oDB.min_k or oWDB.max_k > oDB.max_k:
+            sys.exit(f"\n❌ The rquested k-mer range [{oWDB.min_k}..{oWDB.max_k}] exceeds the range [{oDB.min_k}..{oDB.max_k}] in file {wdb_file}!")
+        # If requested k-mer range is smaller than the available rane, the ranges are ajusted
+        if oWDB.min_k != oDB.min_k or oWDB.max_k != oDB.max_k:
+            oDB = oDB.copy(min_k=oWDB.min_k, max_k=oWDB.max_k)
+        oWDB.extend(oDB.get())
+    
+    if flg_matrix_per_k:
+        for k in range(oWDB.min_k, oWDB.max_k):        
+            # Create and save matrices for each k. To add Label collumn, argument label_taxon should be 'species' or 'genus'
+            output_file = os.path.join(output_folder, f"{k}_mers.csv")
+            matrix = oWDB.get_matrix(min_k=k, 
+                                    max_k=k, 
+                                    data_type=data_type, 
+                                    digit_map=digit_map, 
+                                    label_taxon=label_taxon, 
+                                    matrix_geometry=matrix_geometry,
+                                    out_file=output_file)
+    else:
+        # Create and save one matrix for all k-mers. To add Label collumn, argument label_taxon should be 'species' or 'genus'
+        matrix = oWDB.get_matrix(data_type=data_type, 
+                                digit_map=digit_map, 
+                                label_taxon=label_taxon, 
+                                matrix_geometry=matrix_geometry,
+                                out_file=output_file)
             
-            # Create new matrix file with a title line
-            kmers = sorted([kmer for kmer in oKmerGenerator.generate(k) if kmer[1] <= kmer[2]])
-            # Adjust k-mers to the current matrix geometry (whole | lower | upper)
-            if matrix_geometry.lower() == "lower":
-                kmers = [kmer for kmer in kmers if int(kmer[2]) >= int(kmer[1])] 
-            elif matrix_geometry.lower() == "upper":
-                kmers = [kmer for kmer in kmers if int(kmer[2]) <= int(kmer[1])] 
-            kmer_titles = [f"{oKmerGenerator.restore(int(w[0]),int(w[1]),int(w[2]))}|{w[0]}|{w[1]}|{w[2]}" for w in kmers]  # ['TTAA|4|1|1', 'TTAG|4|1|2', 'TTAT|4|1|3', ...]
-            kmer_words = [rec.split("|")[0] for rec in kmer_titles] # ['TTAA', 'TTAG', 'TTAT', 'TTAC', ...]
-            
-            # create empty matrix files with titles
-            if not os.path.exists(output_file):
-                with open(output_file, "w") as f:
-                    f.write(",".join(["Name", "Taxon"] + kmer_titles))
-                
-            # Cycle through genomes to fill matrix with data 
-            used_species = []
-            for i in range(len(data["genomes"])):
-                # Parse genome, species and lineage data
-                genome = data["genomes"][i]
-                accession = genome['accession']
-                try:
-                    species = genome['lineage'].split("|")[-2].strip()
-                except:
-                    print(f"Problems with parsing genome {genome['lineage']}!")
-                    sys.exit(1)
-                
-                # Check for duplicated species names
-                if species in used_species:
-                    continue
-                used_species.append(species)
-                
-                # Combine word and count data
-                values = data["values"][i]
-                # Set word count values for the current genome
-                for s in range(len(words)):
-                    words[s]['count'] = value_decoder[values[s]]
-                # Convert list of words to dictionary
-                dwords = dict(zip([w['word'] for w in words], words))    
-                
-                # Create CSV record for the current genome
-                record = [str(dwords[word]['count']) if word in dwords else "-2" for word in kmer_words]
-                    
-                with open(output_file, "a") as f:
-                    f.write("\n" + ",".join([accession, species] + record))
-        
     return (True, "Ok", file_references)
 
 # -------------------------------

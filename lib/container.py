@@ -1,25 +1,28 @@
 import tools
 ########################################################################
 class Collection:
-    def __init__(self, title="", version=0, date=""):
+    def __init__(self, title: str = "", version: str = "0", date: str = ""):
         self.title = title
         self.version = version
         self.date = date
+        # Format the date as dd/mm/yyyy
         if not self.date:
             self.date = tools.get_current_date()
             
         self.container = []
         self.para = {}
         
-    def _get_key(self,key):
-        if type(key)==type(0):
+    def _get_key(self, key: str | int):
+        if isinstance(key, int):
             if len(self) <= key:
-                return
+                return None
             return key
-        elif type(key)==type(""):
+        elif isinstance(key, str):
             return self.index(key)
+        else:
+            sys.exit(f"Unsupported index type {type(key)}!")
     
-    def _get_title(self,obj):
+    def _get_title(self, obj):
         if hasattr(obj, 'title'):
             return obj.title
         return ""
@@ -27,8 +30,8 @@ class Collection:
     def __len__(self):
         return len(self.container)
         
-    def __contains__(self,key):
-        if self._get_key(key) != None:
+    def __contains__(self, key: str | int):
+        if self._get_key(key) is not None:
             return True
         return False
     
@@ -40,19 +43,20 @@ class Collection:
             records.append(record)
         return iter(records)
     
-    def __getitem__(self,key):
+    def __getitem__(self, key: str | int):
         key = self._get_key(key)
-        if key != None:
+        if key is not None:
             return self.container[key]
+        return None
     
-    def __setitem__(self,key,value):
+    def __setitem__(self, key: str | int, value):
         key = self._get_key(key)
-        if key != None:
+        if key is not None:
             self.container[key] = value
     
-    def __delitem__(self,key):
+    def __delitem__(self, key: str | int):
         key = self._get_key(key)
-        if key != None:
+        if key is not None:
             del self.container[key]
             
     def __repr__(self):
@@ -63,25 +67,34 @@ class Collection:
         #return ";".join(list(map(lambda Obj: str(Obj), self.container)))
         return ";".join([str(Obj) for Obj in self.container])
             
-    def has(self,title):
+    def has(self, title: str):
         return title in self.get_titles()
+        
+    def get_next_ID(self):
+        return len(self.container)
     
-    def index(self,title):
-        if type(title) == type(0):
+    def index(self, title: int | str):
+        if isinstance(title, int):
             index = title
             if abs(index) >= len(self):
-                return
+                return None
             return index
-        titles = self.get_titles()
-        if title in titles:
-            return titles.index(title)
-        return
+        elif isinstance(title, str):
+            titles = self.get_titles()
+            if title in titles:
+                return titles.index(title)
+            return None
+        else:
+            sys.exit(f"Unsupported index type {type(title)}!")
     
-    def append(self,obj):
+    def append(self, obj):
         self.container.append(obj)
         
-    def extend(self,ls):
-        self.container.extend(ls)
+    def extend(self, ls: list):
+        for obj in ls:
+            if hasattr(obj, "ID"):
+                obj.ID = self.get_next_ID()
+            self.append(obj)
         
     def get_titles(self):
         #return list(map(lambda obj: obj.title, self.container))
@@ -90,12 +103,15 @@ class Collection:
     def keys(self):
         return self.get_titles()
     
-    def get(self,titles=[]):
+    def get(self, titles: list = []):
         if titles:
             #return list(filter(lambda Obj: Obj.title in titles, self.container))
             return [Obj for Obj in self.container if Obj.title in titles]
         else:
             return self.container
+            
+    def get_length(self):
+        return len(self.container)
             
     def copy(self):
         oCollection = Collection(self.title)

@@ -17,8 +17,8 @@ if __name__ == "__main__":
     parser.add_argument("project", nargs="?", default="example")
     parser.add_argument("-i", "--input", default="input")
     parser.add_argument("-o", "--output", default="output")
-    parser.add_argument("--min_k", "-x", type=int, default=4)
-    parser.add_argument("--max_k", "-y", type=int, default=8)
+    parser.add_argument("--min_k", "-x", type=int, default=0)
+    parser.add_argument("--max_k", "-y", type=int, default=0)
     parser.add_argument("--output_file", "-f", type=str, default="")
     parser.add_argument("--output_format", "-r", choices=["newick", "pathways", "Newick", "Pathways"], default="newick")
     parser.add_argument("--cl_algorithm", "-a", choices=["UPGMA", "NJ", "SPECTRAL", "upgma", "nj", "spectral"], default="spectral")
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     extension = ".txt"
     if args.output_format.lower() == "newick":
         extension = ".nwk"
-    output_base = args.output_file if args.output_file else os.path.join(out_path, f"{args.project}{extension}")
+    output_base = os.path.join(out_path, args.output_file) if args.output_file else os.path.join(out_path, f"{args.project}{extension}")
 
     # Execute tree building
     make_tree.execute(

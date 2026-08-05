@@ -21,8 +21,8 @@ if __name__ == "__main__":
     )
     parser.add_argument("-i", "--input", default="input", help="INPUT folder (default: ./input)")
     parser.add_argument("-o", "--output", default="output", help="OUTPUT folder (default: ./output)")
-    parser.add_argument("--min_k", "-x", type=int, default=4, help="Minimal k (included), default: 4")
-    parser.add_argument("--max_k", "-y", type=int, default=5, help="Maximal k (excluded), default: 5")
+    parser.add_argument("--min_k", "-x", type=int, default=0, help="Minimal k (included), default: 4")
+    parser.add_argument("--max_k", "-y", type=int, default=0, help="Maximal k (excluded), default: 5")
     
     parser.add_argument(
         "--output_file", "-f", type=str, default="",
@@ -64,4 +64,4 @@ if __name__ == "__main__":
         matrix_type="V"                          # request to create value matrix
     )
 
-    print(f"✅ Matrix was saved to {output_base}")
+    print(f"✅ Matrix was saved to {output_file}")

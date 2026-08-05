@@ -45,7 +45,8 @@ class kmer_selector:
         if self.output_file:
             output_file = os.path.join(self.out_path, self.output_file)
         
-        pathways = make_tree.execute(self.input_path, 
+        oDB, pathways = make_tree.execute(
+            self.input_path, 
             algorithm = "SPECTRAL",
             output_file=output_file, 
             output_format=self.output_format,
@@ -54,6 +55,7 @@ class kmer_selector:
             max_levels=max_levels,
             force_k=force_k
         )
+        
         if self.output_file:
             print(f"Cluster file was saved to {os.path.join(self.out_path, self.output_file)}")
             
@@ -66,10 +68,12 @@ class kmer_selector:
             folder_path = parts[1:-2]
             if not folder:
                 folder = folder_path
-            elements = parts[-1].split("_")
-            fname = "_".join(elements[:-1])
-            fname = fname[:fname.rfind('.wdb') + 4]
-            accession = elements[-1]
+            accession = parts[-1]
+            if accession.lower().endswith(".wdb"):
+                fname = accession
+            else:
+                fname = f"{accession}.wdb"
+            
             if fname not in components:
                 components[fname] = []
             components[fname].append(accession)
@@ -77,7 +81,7 @@ class kmer_selector:
             if folder_path != folder:
                 subfolder = os.path.join(self.out_path, *folder)
                 os.makedirs(subfolder, exist_ok=True)
-                self.populate_folder(subfolder, components)
+                self.populate_folder(oDB, subfolder, components)
                 folder = folder_path
                 components = {}
             bar(i)
@@ -85,7 +89,7 @@ class kmer_selector:
         # Process last subfolder
         subfolder = os.path.join(self.out_path, *folder)
         os.makedirs(subfolder, exist_ok=True)
-        self.populate_folder(subfolder, components)
+        self.populate_folder(oDB, subfolder, components)
         
         bar.stop()
         
@@ -96,28 +100,18 @@ class kmer_selector:
     # -------------------------------
     # Populate subfolder
     # -------------------------------
-    def populate_folder(self, folder_path, components):
+    def populate_folder(self, oDB: WordDB, folder_path: list, components: dict):
+        titles = oDB.get_titles()
         for fname in components:
             # Expected '*.wdb' file
-            oDB = self.openDBFile(os.path.join(self.input_path, fname))
-            if not oDB:
-                sys.exit()
-            for accession in oDB.get_genomes():
-                if accession not in components[fname]:
-                    oDB.delete_genome(accession)
-            oDB.save_dbfile(os.path.join(folder_path, fname))
-
-    # -------------------------------
-    # Open a custom WordDB file
-    # -------------------------------
-    def openDBFile(self, path):
-        oDB = WordDB()
-        try:
-            oDB.open_dbfile(path)
-        except:
-            tools.msg(f"Problem with opening {path}!")
-            return None
-        return oDB
+            oWDB = WordDB(min_k=oDB.min_k, max_k=oDB.max_k, qualifiers=oDB.qualifiers)
+            for accession in components[fname]:
+                if accession in titles:
+                    oGenome = oDB[accession].copy()
+                    oWDB.append(oGenome)
+                else:
+                    tools.msg(f"\n❌ Genome with accession {accession} was not found in the current database!")
+            oWDB.save_dbfile(os.path.join(folder_path, fname), echo=False)
 
     # -------------------------------
     # Remove tree of folders

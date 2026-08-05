@@ -4,7 +4,7 @@ import glob
 import numpy as np
 import pandas as pd
 from typing import Callable, List, Dict, Tuple
-from word_db import Filter as fl
+#from word_db import Filter as fl
 import tools
 
 def filter_words(matrix, filter_settings, sort_para, flg_common_words = False):

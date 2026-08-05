@@ -3,7 +3,8 @@ from datetime import datetime
 from pathlib import Path
 from itertools import groupby
 # in-house modules
-import word_db, nwmapper, bitwiser, progressbar
+import nwmapper, bitwiser, progressbar
+
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -92,37 +93,107 @@ def openTextFile(fname=None):
         return
 
 def openSeqFile(fname, concatenate = True, delimiter = 50 * "N"):
+    # Parsing lineage informations
+    def get_lineage(rec, file_format):
+        if file_format == "fasta":
+            return rec.description
+        elif file_format == "genbank":
+            # Species name
+            species = rec.annotations.get("organism", "")
+            if not species and rec.features:
+                for feat in rec.features:
+                    if feat.type == "source" and "organism" in feat.qualifiers:
+                        species = feat.qualifiers["organism"][0]
+                        break
+            species = str(species).strip()
+            
+            # Accession number
+            accession = ""
+            try:
+                accession = rec.annotations.get("accessions", [""])[0]
+            except Exception:
+                pass
+            if not accession and hasattr(rec, "id"):
+                accession = rec.id
+            accession = str(accession).strip()
+            
+            # 1) Try taxonomy
+            lineage = ""
+            tax = rec.annotations.get("taxonomy")
+            if isinstance(tax, (list, tuple)) and tax:
+                lineage = "|".join(str(x).strip() for x in tax if str(x).strip())
+            else:
+                # 2) Try species from features
+                if species:
+                    lineage = species
+                else:
+                    # 3) Fallback to annotations['organism'] (already handled as species)
+                    lineage = species
+            
+            # Append species + accession if available
+            extras = []
+            if species:
+                extras.append(species)
+            if accession:
+                extras.append(accession)
+            
+            if extras:
+                lineage = f"{lineage}|{'|'.join(extras)}" if lineage else "|".join(extras)
+            
+            return lineage
+        else:
+            return ""
+                
     if not os.path.exists(fname):
         return {}
     if fname[fname.rfind("."):] in (".fa",".fsa",".fas",".fst",".fna",".fasta"):
+        file_format = "fasta"
         records = list(SeqIO.parse(fname, "fasta"))
     elif fname[fname.rfind("."):] in (".gbk", ".gbf", ".gbff", ".gb"):
+        file_format = "genbank"
         records = list(SeqIO.parse(fname, "genbank"))
     
     if concatenate:
         seqname = os.path.basename(fname)
         seqname = seqname[:seqname.rfind(".")] if "." in seqname else seqname
-        seqlist = {seqname:delimiter.join([str(seq.seq).upper() for seq in records])}
+        concatenated_sequence = delimiter.join([str(seq.seq).upper() for seq in records])
+        seqlist = {seqname:{"seq":concatenated_sequence, "lineage":get_lineage(records[0], file_format)}}
     else:
-        seqlist = dict(zip([seq.description for seq in records], [str(seq.seq).upper() for seq in records]))
+        seqlist = dict(zip([seq.description for seq in records], [{"seq":str(rec.seq).upper(),"lineage":get_lineage(rec, file_format)} for rec in records]))
         
     return seqlist
+    
+def ascertain_range_borders(min_v: int, max_v: int, low_cutoff: int = 0):
+    if any([ascertain_integer(v, low_cutoff = low_cutoff, top_cutoff=max_v) is False for v in [min_v, max_v]]):
+        print()
+        sys.exit(f"Range border values [{min_v}..{max_v}] must be integers above {low_cutoff}!")
+    if max_v <= min_v:
+        print()
+        sys.exit(f"Top border {max_v} must be greater than lower border {min_v}!")
+    return True
 
-def msg(msg,title=""):
-    if title:
-        title += "\n"
-    print(f"\n{title}{msg}\n")
-       
-def ascertain_integer(v, low_cutoff=0, top_cutoff=None):
+def ascertain_integer(v: int, low_cutoff: int = 0, top_cutoff=None):
     try:
         ivalue = int(v)
-        if ivalue > low_cutoff:
-            if top_cutoff != None and ivalue > top_cutoff:
-                return False
-            return ivalue
     except (ValueError, TypeError):
-        return False
+        msg(f"The passed value {v} is not an integer!")
+        return None
+        
+    # Check if the value is an integer
+    if ivalue != v:
+        msg(f"The passed value {v} is not an integer!")
+        return None
 
+    if ivalue < low_cutoff:
+        msg(f"The passed value {v} is smaller than low threshold {low_cutoff}!")
+        return None
+
+    if top_cutoff is not None and ivalue > top_cutoff:
+        msg(f"The passed value {v} is bigger than top threshold {low_cutoff}!")
+        return None
+
+    return ivalue
+    
 def ascertain_float(v, low_cutoff=0, top_cutoff=None):
     try:
         ivalue = float(v)
@@ -133,6 +204,11 @@ def ascertain_float(v, low_cutoff=0, top_cutoff=None):
     except (ValueError, TypeError):
         return False
 
+def msg(msg,title=""):
+    if title:
+        title += "\n"
+    print(f"\n{title}{msg}\n")
+       
 """
 Nicely prints the Newick string representation as a tree.
 """    
@@ -274,18 +350,6 @@ def count_word(sequence: str, word: str, count_reverse_complement: bool = False)
         pos = sequence.find(word,start)
     return count
     
-def word_list_to_counts(sorted_words: list) -> list:    # words = ["ACCTG", "ACCTG", "ATG", "GCTA", "GCTA", "GCTA"] -> [['ACCTG', 2], ['ATG', 1], ['GCTA', 3]]
-    """
-    Convert a sorted list of words into [[word, count], ...].
-    
-    Args:
-        sorted_words (list[str]): Sorted list of words.
-        
-    Returns:
-        list[list]: Each record is [word, count].
-    """
-    return [[word, sum(1 for _ in group)] for word, group in groupby(sorted_words)]
-
 # Return percentile of word distribution by word frequency
 # Percentiles as 0.01, 0.5, 0.95, ...
 def percentile(frq,wlength):
@@ -593,49 +657,6 @@ def reverse_complement(seq: str) -> str:
     
     # Convert to uppercase, reverse string, and map each base
     return "".join(complement.get(base, "N") for base in reversed(seq.upper()))    
-
-def set_value(wlength, count: int, seqlength: int, binary_code: bool = False, coding: list = []):
-    '''
-    thresholds = {
-        2: [73260, 102188, 115255],
-        3: [24183, 31537, 36122],
-        4: [4747, 7121, 8979],
-        5: [1230, 1759, 2457],
-        6: [267, 417, 615],
-        7: [61.5, 100.2, 157.0],
-        8: [13.6, 23.6, 39.4],
-        9: [3.1, 5.78, 10.11],
-        10: [0.8628, 1.5429, 2.9282],
-        11: [0.43134, 0.62658, 1.024],
-    }
-    '''
-    
-    thresholds = {
-        2: [48840, 68125, 76837],
-        3: [16122, 21025, 24081],
-        4: [3165, 4747, 5986],
-        5: [820, 1173, 1638],
-        6: [178, 278, 410],
-        7: [41.0, 66.8, 104.7],
-        8: [9.1, 15.7, 26.3],
-        9: [2.1, 3.85, 6.74],
-        10: [0.5752, 1.0286, 1.9521],
-        11: [0.28756, 0.41772, 0.683],
-    }
-    
-    f = 1000000 * count / seqlength
-    
-    level = 3
-    for i in range(3):
-        if f <= thresholds[wlength][i]:
-            level = i
-            break
-    if binary_code:
-        values = ["000", "001", "011", "111"]
-        return values[level]
-    if coding and len(coding) == 4:
-        return coding[level]
-    return level
 
 def str2bool(v: str) -> bool:
     """

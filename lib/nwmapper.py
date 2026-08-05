@@ -41,7 +41,7 @@ class Mapper:
         return [wlength,x,y]
     
     # Create a list of all possible words of the given length
-    def generate(self,wlength):
+    def generate(self, wlength: int):
         words = []
         p = 2**(wlength+wlength%2)
         for x in range(p):
@@ -610,16 +610,116 @@ class Mapper:
             p -= 1
         return elements
     
+    def inline_index(self, word: str, min_k: int = 1):
+        """
+        Return the zero-based index of a k-mer in the concatenated list
+        generated for k = min_k, min_k + 1, ...
+    
+        `word` may be:
+            "ATG"           # DNA word
+            "3,3,5"         # k,x,y
+            "ATG,3,3,5"     # word,k,x,y
+            [3,3,5]         # list of indices
+            ["ATG",3,3,5]   # word + indices
+    
+        Returns None if (x, y) is not a valid combination for the given k.
+        """
+    
+        if isinstance(word, list):
+            indices = word
+        else:
+            indices = word.split(",")
+    
+        if len(indices) == 4:
+            w, x, y = indices[1:]
+    
+        elif len(indices) == 1:
+            w, x, y = self.__call__(word.upper())
+    
+        elif len(indices) == 3:
+            w, x, y = indices
+    
+        else:
+            sys.exit(
+                "K-mer must be specified as 'word', 'k,x,y', "
+                "or 'word,k,x,y'."
+            )
+    
+        try:
+            w, x, y = [int(v) for v in (w, x, y)]
+        except (ValueError, TypeError):
+            sys.exit(
+                f"Invalid k-mer indices: k={w}, x={x}, y={y}. "
+                "All indices must be integers."
+            )
+    
+        if w < min_k:
+            sys.exit(
+                f"K-mer length {w} is below the minimum length {min_k}."
+            )
+    
+        # Number of valid k-mers preceding length w:
+        #
+        # 4^min_k + 4^(min_k+1) + ... + 4^(w-1)
+        #
+        offset = (4**w - 4**min_k) // 3
+    
+        if w % 2 == 0:
+            # For even k:
+            # x = 1 .. 2^k
+            # y = 1 .. 2^k
+            p = 2**w
+    
+            if not (1 <= x <= p and 1 <= y <= p):
+                return None
+    
+            local_index = (x - 1) * p + (y - 1)
+    
+        else:
+            # For odd k:
+            # x = 1 .. 2^(k+1)
+            # y = 1 .. 2^(k+1), but only 1/4 of y values
+            # are valid for each x.
+            p = 2**(w + 1)
+    
+            if not (1 <= x <= p and 1 <= y <= p):
+                return None
+    
+            # generate() effectively requires:
+            #
+            # (y - 1) % 4 == ((x - 1) % 4 + 2) % 4
+            #
+            expected_y_mod = ((x - 1) + 2) % 4
+    
+            if (y - 1) % 4 != expected_y_mod:
+                return None
+    
+            # Number of possible y values for each x
+            n_y = p // 4
+    
+            local_index = (
+                (x - 1) * n_y
+                + (y - 1) // 4
+            )
+    
+        return offset + local_index
+        
 ###################################################
 if __name__ == "__main__":
     #import word_db
     pass
+    
     tester = Mapper()
+    for k in range(1,4):
+        word_list = tester.generate(k)
+        print([",".join([tester(w,x,y),str(w),str(x),str(y)]) for w,x,y in word_list])
+        
+    '''
     #print tester.compare_words("AAGGCAAGGATGGACG","AAGGA")
     word = "TCCATCGG"
     wlength,x,y = tester(word)
     print(word,wlength,x,y)
-    '''
+    
     permutations = tester.left_increment(word,2)
     print(permutations)
     print(len(permutations))

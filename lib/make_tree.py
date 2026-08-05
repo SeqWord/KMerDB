@@ -8,7 +8,9 @@ from word_db import WordDB
 from dendro import Root as tree
 from spectra import spectral_analysis as spa
 
-def execute(path: str, min_k: int = 4, max_k: int = 5,
+def execute(path: str, 
+    min_k: int = 0, 
+    max_k: int = 0,
     algorithm: str = "SPECTRAL",          # NJ | UPGMA | SPECTRAL | "" - return value matrix (v_matrix)
     output_file: str = "",
     output_format: str = "",
@@ -33,105 +35,66 @@ def execute(path: str, min_k: int = 4, max_k: int = 5,
     matrix = []
     values = []
     v_matrix = []
-    bar = progressbar.indicator(len(wdb_files),"Process input files... ")
-    counter = 0
     
     for fname in wdb_files:
         # Open WDB file
         oDB = openDBFile(os.path.join(path, fname))
-        if oDB == None:
+        if oDB is None:
             continue
+        if min_k == 0 or min_k < oDB.min_k:
+            min_k = oDB.min_k
+        if max_k == 0 or max_k > oDB.max_k:
+            max_k = oDB.max_k
         
-        # Extract data from WDB object
-        data = oDB.export_db(min_k, max_k - 1)
-        words = data["words"]
-        if not v_matrix and matrix_type == "V":
-            v_matrix = [["Genome"] + [word['word'] for word in words]]
+        genomes += oDB.get()
         
-        # Sort genomes by ID
-        data['genomes'].sort(key=lambda d: int(d['ID']))
-        for g in data['genomes']:
-            g['file'] = os.path.basename(fname)
-        genomes += data['genomes']
-        
-        # Transpose 'values' from [words][genomes] to [genomes][words]
-        # "values":[['001', '111', '011', ...],...],    # Number of lists = number of genomes, number of values per list = number of words
-        # matrix = [[ls[int(genome['ID']) - 1] for ls in data['values']] for genome in data['genomes']]
-        for i in range(len(genomes)):
-            matrix.append([])
-            for j in range(len(words)):
-                matrix[i].append(data['values'][j][i])
-        
-        # Set total
-        if not total:
-            total = len(matrix[0]) * 3
-            
-        # Each value is a long integer
-        values = [int("1"+"".join(ls), 2) for ls in matrix]
-        
-        counter += 1
-        bar(counter)
-    
-    bar.stop()
+    oDB = WordDB(min_k=min_k, max_k=max_k)
+    oDB.extend(genomes)
     
     # Set value v_matrix
     if matrix_type == "V":
-        mapping = {
-            '000': '-2',
-            '001': '-1',
-            '011':  '1',
-            '111':  '2'
-        }
-        for i in range(len(genomes)):
-            v_matrix.append([genomes[i]['accession']] + [mapping[value] for value in matrix[i]])
-            
+        matrix = oDB.get_matrix(min_k=min_k, max_k=max_k, data_type="digit", digit_map=[-2, -1, 1, 2])
         delimiter = "\t"
         if output_format.upper() == "CSV":
             delimiter = ","
-        tools.saveTextFile(
-            strText = "\n".join([delimiter.join(line) for line in v_matrix]),
-            fname = output_file)
-        return
-    
-    # Set distance d_matrix
-    d_matrix = []
-    for i in range(len(values) - 1):
-        d_matrix.append([])
-        for j in range(i + 1, len(values)):
-            a, b = [values[i], values[j]]
-            d_matrix[-1].append((a ^ b).bit_count() / total)
             
-    # Collection of paths 'Root>1>1>0>Label'
-    labels = [f"{genome['file']}_{genome['accession']}" for genome in genomes]
-    
-    if algorithm.upper() == "UPGMA":
-        pathways = upgma_paths_from_upper_triangle(d_matrix, labels, output_file=output_file)
-    elif algorithm.upper() == "NJ":
-        pathways = nj_paths_from_upper_triangle(d_matrix, labels, output_file=output_file)
-    elif algorithm.upper() == "SPECTRAL":
-        pathways = spa(matrix=d_matrix, 
-            labels=labels, 
-            max_cluster_number=max_cluster_number, 
-            max_cluster_content=max_cluster_content,
-            max_levels=max_levels,
-            force_k = force_k,
-            output_format=output_format,    # pathways/newick
-            output_file=output_file         # save output in a separate file
+        data = "\n".join(
+            delimiter.join(str(value) for value in row)
+            for row in matrix
         )
+        
+        tools.saveTextFile(
+            strText = data,
+            fname = output_file)
+        return oDB, matrix
+    
+    if matrix_type == "D" and algorithm=="":
+        matrix = oDB.get_distance_matrix(min_k=min_k, max_k=max_k, distance_type="hamming", matrix_geometry="whole")
+        delimiter = "\t"
+        if output_format.upper() == "CSV":
+            delimiter = ","
+            
+        data = "\n".join(
+            delimiter.join(str(value) for value in row)
+            for row in matrix
+        )
+        
+        tools.saveTextFile(
+            strText = data,
+            fname = output_file)
+        return oDB, matrix
+        
+    if algorithm.upper()=="SPECTRAL":
+        return oDB, oDB.cluster_genomes(min_k=min_k, max_k=max_k, distance_type="hamming", cl_algorithm="spectral", output_format=output_format, out_file=output_file, echo=False)
+    elif algorithm.upper()=="UPGMA":
+        return oDB, oDB.cluster_genomes(min_k=min_k, max_k=max_k, distance_type="hamming", cl_algorithm="upgma", out_file=output_file, echo=False)
+    elif algorithm.upper()=="NJ":
+        return oDB, oDB.cluster_genomes(min_k=min_k, max_k=max_k, distance_type="hamming", cl_algorithm="nj", out_file=output_file, echo=False)
     else:
         tools.msg(f"Unknown clustering algoritm {algorithm}!")
         sys.exit()
+        
     
-    """
-    # Create oTree object
-    oTree = tree(description = os.path.basename(path))
-    
-    #### ERROR
-    for pathway in pathways:
-        oTree.append(pathway)
-    """
-    
-    return pathways
 
 # -------------------------------
 # Open a custom WordDB file

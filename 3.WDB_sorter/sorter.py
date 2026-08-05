@@ -38,6 +38,7 @@ def show_help():
     │ sklearn           │ 1.7.0                 │
     │ statsmodels       │ 0.14.5                │
     │ scipy             │ 1.15.2                │
+    │ pymongo           │ 4.17.0                │
     │ pandas            │ 2.2.3                 │
     │ numpy             │ 2.2.3                 │
     └───────────────────┴───────────────────────┘
@@ -49,8 +50,6 @@ def show_help():
         --input,                -i   • Input folder (default: 'input')
         --output                -o   • Output folder (default: 'output')
         --tmp_path              -t   • Temporary folder (default: 'tmp')
-        --output_file,          -f   • Output file to save (default: '')
-        --output_format,        -r   • Output format newick/pathways (default: 'pathways')
         --max_cluster_number,   -m   • Maximum number of child clusters in internal nodes: (default: 7)
         --max_cluster_content,  -c   • Maximum number of leaves in terminal nodes: (default: 7)
         --max_levels,           -l   • Maximum depth of hierarchy: (default: 5)
@@ -80,8 +79,6 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input", default="input")
     parser.add_argument("-o", "--output", default="output")
     parser.add_argument("-t", "--tmp_path", default="tmp")
-    #parser.add_argument("--output_file", "-f", type=str, default="")
-    #parser.add_argument("--output_format", "-r", type=str, default="pathways")
     parser.add_argument("--max_cluster_number", "-m", type=int, default=7)
     parser.add_argument("--max_cluster_content", "-c", type=int, default=7)
     parser.add_argument("--max_levels", "-l", type=int, default=5)
@@ -107,20 +104,6 @@ if __name__ == "__main__":
     # Locate tmp folder (k-mer matrices will be written here, mirroring leaf structure)
     os.makedirs(args.tmp_path, exist_ok=True)
 
-    '''
-    output_file = ""
-    output_format = args.output_format.lower()
-    if args.output_file and args.cl_algorithm:
-        output_file = args.output_file
-        extension = ""
-        if output_file.rfind(".") > 0:
-            extension = output_file[output_file.rfind("."):]
-            if output_format == "newick" and extension.upper() != ".NWK":
-                extension = ".nwk"
-            output_file = output_file[:output_file.rfind(".")]
-        output_file = f"{tools.format_file_name(output_file)}.{args.cl_algorithm.lower()}{extension}"
-    '''
-            
     oKmerSelector = main.kmer_selector(input_path=input_path, 
             out_path=outpath, tmp_path=tmp_path, project=project_folder)
     oKmerSelector.execute(max_cluster_number=args.max_cluster_number, max_cluster_content=args.max_cluster_content, 

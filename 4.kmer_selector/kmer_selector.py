@@ -8,7 +8,8 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 LIB_DIR = BASE_DIR.parent / "lib"
 sys.path.append(str(LIB_DIR))
-import main, tools
+import kmer_selector_main as main
+import tools
 
 date_of_creation = "September 21, 2025"
 __version__ = "1.3"
@@ -50,8 +51,8 @@ def show_help():
         --tmp_path       -t   • Temporary folder (default: 'tmp')
         --diverse_words, -d   • Select diverse words (T/F), default: T
         --common_words,  -c   • Select diverse words (T/F), default: T
-        --min_k,         -x   • Minimal k-value, default 4
-        --max_k,         -y   • Maximal k-value, default 8
+        --min_k,         -x   • Minimal k-value, default 0
+        --max_k,         -y   • Maximal k-value, default 0
         --top_selected,  -t   • Maximal number of selected k-mers, default: 100
         --min_selected,  -l   • Manimal number of selected k-mers, default: 10
         --use_NN,        -n   • Enable or disable use of neural network (default T/t/Y/y = True, else F/f/N/n = False)
@@ -91,8 +92,8 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input", default="input")
     parser.add_argument("-o", "--output", default="output")
     parser.add_argument("--tmp_path", default="tmp")
-    parser.add_argument("--min_k", "-x", type=int, default=4)
-    parser.add_argument("--max_k", "-y", type=int, default=8)
+    parser.add_argument("--min_k", "-x", type=int, default=0)
+    parser.add_argument("--max_k", "-y", type=int, default=0)
     parser.add_argument("-t", "--top_selected", type=str, default=100)
     parser.add_argument("-l", "--min_selected", type=str, default=10)
     parser.add_argument("-n", "--use_NN", type=tools.str2bool, choices=["T", "t", "F", "f", "Y", "y", "N", "n"], default=True)
@@ -110,12 +111,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Check argument settings
-    min_k, max_k = [tools.ascertain_integer(v, 1) for v in [args.min_k, args.max_k]]
-    if not all([min_k, max_k]):
-        print(f"\n❌ Error: min_k and max_k '{min_k}, {max_k}' must be integers > 1!")
+    min_k, max_k = [tools.ascertain_integer(v, 0) for v in [args.min_k, args.max_k]]
+    if any([v is None for v in [min_k, max_k]]):
+        print(f"\n❌ Error: min_k and max_k '{min_k}, {max_k}' must be integers >= 0!")
         sys.exit(1)
-    if min_k >= max_k:
-        print(f"\n❌ Error: min_k must be smaller than max_k: '{min_k}, {max_k}' !")
+    if min_k > max_k:
+        print(f"\n❌ Error: min_k must be smaller or equal to max_k: '{min_k}, {max_k}' !")
         sys.exit(1)
         
     try:
