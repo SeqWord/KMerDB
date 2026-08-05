@@ -11,6 +11,8 @@ sys.path.append(str(LIB_DIR))
 
 import make_tree  # assumes make_tree.py is in ../lib
 
+__version__ = "05.08.2026"
+
 if __name__ == "__main__":
     # Manual parser setup (disabling default help/version)
     parser = argparse.ArgumentParser(add_help=False)

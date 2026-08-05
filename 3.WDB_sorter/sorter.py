@@ -11,8 +11,8 @@ import wdb_sorter_main as main
 import tools, wdb_reader, CSV_merger
 from dendro import Root as tree
 
-date_of_creation = "September 21, 2025"
-__version__ = "1.3"
+date_of_creation = "August 5, 2026"
+__version__ = "1.0"
 
 def show_help():
     help_text = f"""
@@ -21,7 +21,7 @@ def show_help():
     ■ Selects most suitable k-mers to separate or join taxonomic groups ■
     {'='*80}
     📅 Created: {date_of_creation}
-    👨‍💻 Author: Oleg Reva (oleg.reva@up.ac.za)
+    👨‍💻 Contact: Oleg Reva (oleg.reva@up.ac.za)
        Centre for Bioinformatics and Computational Biology,
        BGM, University of Pretoria, South Africa
 

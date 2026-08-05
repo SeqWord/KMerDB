@@ -14,6 +14,8 @@ sys.path.append(str(LIB_DIR))
 import tools
 from word_db import WordDB as wdb  # type: ignore
 
+__version__ = "05.08.2026"
+
 # Acceptable input file extensions
 GBK_EXTENSIONS = (".gbk", ".gb", ".gbf", ".gbff")
 FASTA_EXTENSIONS = (".fa", ".fsa", ".fas", ".fst", ".fna", ".fasta")

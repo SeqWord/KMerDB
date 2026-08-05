@@ -17,7 +17,7 @@ from Bio.SeqRecord import SeqRecord
 # Metadata & Help/Version
 # ──────────────────────────────────────────────────────────────────────────────
 
-date_of_creation = "September 21, 2025"
+date_of_creation = "August 5, 2026"
 __version__ = "1.0"
 
 
@@ -28,7 +28,7 @@ def show_help():
     ■ Generate artificial DNA reads from GenBank genomes ■
     {'='*80}
     📅 Created: {date_of_creation}
-    👨‍💻 Author: Oleg Reva (oleg.reva@up.ac.za)
+    👨‍💻 Contact: Oleg Reva (oleg.reva@up.ac.za)
        Centre for Bioinformatics and Computational Biology,
        BGM, University of Pretoria, South Africa
 
