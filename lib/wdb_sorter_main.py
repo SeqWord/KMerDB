@@ -56,43 +56,76 @@ class kmer_selector:
             force_k=force_k
         )
         
+        print()
+        for line in pathways:
+            print(line)
+        print()
+        
         if self.output_file:
             print(f"Cluster file was saved to {os.path.join(self.out_path, self.output_file)}")
             
         components = {}
-        folder = []
-        bar = progressbar.indicator(len(pathways),"Sorting  WDB  files... ")
-        for i in range(len(pathways)):
-            parts = pathways[i].split(">")
-            # Remove from the path 'Root' and the leafe node number
+        folder = None
+        
+        bar = progressbar.indicator(
+            len(pathways),
+            "Sorting WDB files... ",
+        )
+        
+        for i, pathway in enumerate(pathways):
+            parts = pathway.split(">")
+        
+            # Remove "Root", the final leaf index, and the accession.
+            #
+            # Example:
+            # Root>1>3>0>M.leprae_NC_002677
+            #
+            # folder_path -> ["1", "3"]
+            # accession   -> "M.leprae_NC_002677"
             folder_path = parts[1:-2]
-            if not folder:
-                folder = folder_path
             accession = parts[-1]
+        
+            # Before adding the current genome, save accumulated genomes
+            # if the pathway has moved to a different terminal folder.
+            if folder is not None and folder_path != folder:
+                subfolder = os.path.join(self.out_path, *folder)
+                os.makedirs(subfolder, exist_ok=True)
+        
+                self.populate_folder(
+                    oDB,
+                    subfolder,
+                    components,
+                )
+        
+                components = {}
+        
+            # Set or update the current folder.
+            folder = folder_path
+        
+            # Determine the output WDB filename.
             if accession.lower().endswith(".wdb"):
                 fname = accession
             else:
                 fname = f"{accession}.wdb"
-            
-            if fname not in components:
-                components[fname] = []
-            components[fname].append(accession)
-            
-            if folder_path != folder:
-                subfolder = os.path.join(self.out_path, *folder)
-                os.makedirs(subfolder, exist_ok=True)
-                self.populate_folder(oDB, subfolder, components)
-                folder = folder_path
-                components = {}
-            bar(i)
         
-        # Process last subfolder
-        subfolder = os.path.join(self.out_path, *folder)
-        os.makedirs(subfolder, exist_ok=True)
-        self.populate_folder(oDB, subfolder, components)
+            # Add the current genome to the current folder.
+            components.setdefault(fname, []).append(accession)
+        
+            bar(i + 1)
+        
+        # Process the final folder after the loop.
+        if folder is not None and components:
+            subfolder = os.path.join(self.out_path, *folder)
+            os.makedirs(subfolder, exist_ok=True)
+        
+            self.populate_folder(
+                oDB,
+                subfolder,
+                components,
+            )
         
         bar.stop()
-        
+            
         print()
         print(f"🧮 Folder tree structure: {self.out_path} has successfully been created!")
         print()

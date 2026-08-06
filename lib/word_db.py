@@ -66,7 +66,8 @@ class WordDB(container.Collection):
             data_type: str = "digit",                   # digit | count | z-score
             digit_map: list = [-2, -1, 1, 2],           # four member list, aplicable for datatype 'digit' to transform '000', '001', '011', '111' to numbers
             matrix_geometry: str = "whole",             # whole | upper | lower
-            out_file: str = ""                          # optional output file name
+            out_file: str = "",                         # optional output file name
+            kmer_title: str = "word"                    # word | triplet | combined = TTAA | 4,1,1 | TTAA,4,1,1
         ):
 
         """
@@ -128,7 +129,8 @@ class WordDB(container.Collection):
                 data_type=data_type,
                 digit_map=digit_map,
                 matrix_geometry=matrix_geometry,
-                out_file=out_file
+                out_file=out_file,
+                kmer_title=kmer_title
             )
         
         # Digit translator
@@ -224,10 +226,14 @@ class WordDB(container.Collection):
     
             for record in kmer_records:
                 parts = record.split(",")
-    
                 # With flg_add_kmers=True, the first field is the
                 # nucleotide representation of the k-mer.
-                titles.append(parts[0])
+                if kmer_title == "word":
+                    titles.append(parts[0])
+                elif kmer_title == "triplet":
+                    titles.append(",".join(parts[1:-1]))
+                elif kmer_title == "combined":
+                    titles.append(",".join(parts[:-1]))
     
                 raw_value = parts[-1]
     
