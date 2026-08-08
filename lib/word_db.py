@@ -89,11 +89,15 @@ class WordDB(container.Collection):
         bar.stop()
     
     # Create a matrix of requested genome sequence parameters
-    def genome_parameter_matrix(
+    def get_genome_parameter_matrix(
             self,
             gc_content: bool = False,
             gc_skew: bool = False,
+            abs_gc_skew: bool = False,
+            at_skew: bool = False,
+            abs_at_skew: bool = False,
             purine_skew: bool = False,
+            abs_purine_skew: bool = False,
             pattern_skew: bool = False,
             pattern_variance: bool = False,
             pattern_stdev: bool = False,
@@ -124,7 +128,11 @@ class WordDB(container.Collection):
         settings = [
             gc_content,
             gc_skew,
+            abs_gc_skew,
+            at_skew,
+            abs_at_skew,
             purine_skew,
+            abs_purine_skew,
             pattern_skew,
             pattern_variance,
             pattern_stdev,
@@ -141,7 +149,11 @@ class WordDB(container.Collection):
         titles = [
             "GC-content",
             "GC-skew",
+            "Abs-GC-skew",
+            "AT-skew",
+            "Abs-AT-skew",
             "Purine-skew",
+            "Abs-Purine-skew",
             "Pattern-skew",
             "Pattern-variance",
             "Pattern-stdev",
@@ -154,10 +166,14 @@ class WordDB(container.Collection):
         function_names = [
             "get_gc_content",
             "get_gc_skew",
+            "get_abs_gc_skew",
+            "get_at_skew",
+            "get_abs_at_skew",
             "get_purine_skew",
+            "get_abs_purine_skew",
             "get_pattern_skew",
             "get_pattern_variance",
-            "get_pattern_stdev",
+            "get_pattern_std",
         ]
     
         # Create the header row containing only requested parameters.
@@ -1372,7 +1388,7 @@ class Genome:
         # Normalize the format once instead of repeatedly calling lower().
         data_type = data_type.lower()
     
-        allowed_formats = {"digit", "count", "z-score"}
+        allowed_formats = {"digit", "count", "z-score", "median_centered-z-score"}
     
         if data_type not in allowed_formats:
             sys.exit(
@@ -1957,6 +1973,43 @@ class Genome:
     
         return f"{skew:.{digits}f}"
         
+    def get_abs_gc_skew(self, digits: int = 0):
+        return abs(self.get_gc_skew(digits=digits))
+        
+    def get_at_skew(self, digits: int = 0):
+        """
+        Calculate the AT-skew of the sequence.
+    
+        AT-skew = (A - T) / (A + T)
+    
+        Parameters
+        ----------
+        digits : int, default=0
+            If >0, return the value formatted with the specified number of
+            decimal places; otherwise return a float.
+    
+        Returns
+        -------
+        float or str
+            AT-skew as a float (digits=0) or formatted string.
+        """
+    
+        at = self.ATGC["A"] + self.ATGC["T"]
+    
+        if at == 0:
+            skew = 0.0
+        else:
+            skew = (self.ATGC["A"] - self.ATGC["T"]) / at
+    
+        if digits <= 0:
+            return skew
+    
+        return f"{skew:.{digits}f}"
+        
+    def get_abs_at_skew(self, digits: int = 0):
+        return abs(self.get_at_skew(digits=digits))
+        
+        
     def get_purine_skew(self, digits: int = 0):
         """
         Calculate the purine-skew of the sequence.
@@ -1984,6 +2037,10 @@ class Genome:
             return skew
     
         return f"{skew:.{digits}f}"
+        
+    def get_abs_purine_skew(self, digits: int = 0):
+        return abs(self.get_purine_skew(digits-digits))
+        
         
     #### PRIVATE METHODS
 
