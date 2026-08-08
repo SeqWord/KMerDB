@@ -41,21 +41,153 @@ class WordDB(container.Collection):
             flg_concatenate: bool = True,
             flg_keep_sequence: bool = False):
         # Get ID
-        ID = self.get_length()
+        ID = self.get_next_ID()
         genome = tools.openSeqFile(input_path, flg_concatenate)
         genome_title, data = list(genome.items())[0]
         sequence = data["seq"]
         lineage = data["lineage"]
         
         oGenome = Genome(title = genome_title, ID = ID, min_k = self.min_k, max_k = self.max_k, lineage=lineage)
-        print()
-        print(genome_title)
+        
+        tools.msg(genome_title)
+        
         oGenome.process_sequence(sequence = sequence.upper(), 
             targer_seq_length = targer_seq_length, 
             chunk_number = chunk_number, 
             flg_keep_sequence = flg_keep_sequence)
         self.append(oGenome)
+
+    def deplete_sequence(self, 
+            in_path: str, 
+            chunk_number: int, 
+            min_chunk_length: int, 
+            max_chunk_length: int,
+            flg_keep_sequence: bool = False,
+            flg_concatenate: bool = True,
+        ):
         
+        genome = tools.openSeqFile(in_path, flg_concatenate)
+        genome_title, data = list(genome.items())[0]
+        sequence = data["seq"]
+        lineage = data["lineage"]
+        # Fragment sequence to chunks
+        chunks = tools.deplete_sequence(sequence=sequence, 
+            chunk_number=chunk_number, 
+            min_chunk_length=min_chunk_length, 
+            max_chunk_length=max_chunk_length
+        )
+        
+        bar = progressbar.indicator(len(chunks), f"{genome_title} processing: ")
+        for i in range(len(chunks)):
+            chunk = chunks[i]
+            ID = self.get_next_ID()
+            oGenome = Genome(title = genome_title, ID = ID, min_k = self.min_k, max_k = self.max_k, lineage=lineage)
+        
+            oGenome.process_sequence(sequence = chunk.upper(), flg_keep_sequence = flg_keep_sequence, echo=False)
+            self.append(oGenome)
+            bar(i + 1)
+        bar.stop()
+    
+    # Create a matrix of requested genome sequence parameters
+    def genome_parameter_matrix(
+            self,
+            gc_content: bool = False,
+            gc_skew: bool = False,
+            purine_skew: bool = False,
+            pattern_skew: bool = False,
+            pattern_variance: bool = False,
+            pattern_stdev: bool = False,
+        ):
+        """
+        Create a matrix containing selected genome statistics.
+    
+        Each row represents one genome. The first row contains column
+        headings. Parameters whose corresponding argument is False are
+        omitted from the matrix.
+    
+        Returns
+        -------
+        list[list] or None
+            Matrix in the form:
+    
+                [
+                    ["Genome", "GC-content", "GC-skew", ...],
+                    ["Genome_1", value1, value2, ...],
+                    ["Genome_2", value1, value2, ...],
+                    ...
+                ]
+    
+            Returns None if no parameters were requested.
+        """
+    
+        # Flags defining which genome statistics should be calculated.
+        settings = [
+            gc_content,
+            gc_skew,
+            purine_skew,
+            pattern_skew,
+            pattern_variance,
+            pattern_stdev,
+        ]
+    
+        # Nothing was requested.
+        if all(setting is False for setting in settings):
+            tools.msg(
+                "None of the genome statistic parameters were requested!"
+            )
+            return None
+    
+        # Column titles corresponding to the entries in `settings`.
+        titles = [
+            "GC-content",
+            "GC-skew",
+            "Purine-skew",
+            "Pattern-skew",
+            "Pattern-variance",
+            "Pattern-stdev",
+        ]
+    
+        # Methods corresponding to the entries in `settings`.
+        #
+        # These are stored as method names rather than bound methods because
+        # each function must later be called for a different Genome object.
+        function_names = [
+            "get_gc_content",
+            "get_gc_skew",
+            "get_purine_skew",
+            "get_pattern_skew",
+            "get_pattern_variance",
+            "get_pattern_stdev",
+        ]
+    
+        # Create the header row containing only requested parameters.
+        headings = ["Genome"]
+    
+        for i in range(len(settings)):
+            if settings[i] is not False:
+                headings.append(titles[i])
+    
+        # Initialize the matrix with the header row.
+        matrix = [headings]
+    
+        # Process all genomes in the database.
+        for oGenome in self:
+            row = [oGenome.title]
+    
+            # Calculate only requested statistics.
+            for i in range(len(settings)):
+                if settings[i] is not False:
+                    function = getattr(
+                        oGenome,
+                        function_names[i],
+                    )
+    
+                    row.append(function())
+    
+            matrix.append(row)
+    
+        return matrix        
+
     def get_matrix(self,
             min_k: int = 0,
             max_k: int = 0,
@@ -63,7 +195,7 @@ class WordDB(container.Collection):
             end_genome: int | str = 0,
             genome_list: list = [],
             label_taxon: str = "",                      # '' | species | genus
-            data_type: str = "digit",                   # digit | count | z-score
+            data_type: str = "digit",                   # digit | count | z-score | median_centered-z-score
             digit_map: list = [-2, -1, 1, 2],           # four member list, aplicable for datatype 'digit' to transform '000', '001', '011', '111' to numbers
             matrix_geometry: str = "whole",             # whole | upper | lower
             out_file: str = "",                         # optional output file name
@@ -323,9 +455,10 @@ class WordDB(container.Collection):
         start_genome: int | str = 0,
         end_genome: int | str = 0,
         genome_list: list | None = None,
-        distance_type: str = "hamming",     # hamming | rank | euclidean
-        matrix_geometry: str = "whole",     # whole | upper | lower
-        out_file: str = "",                 # optional output filename
+        distance_type: str = "hamming",             # hamming | rank | euclidean
+        data_type: str = "median_centered-z-score", # count | z-score | median_centered-z-score
+        matrix_geometry: str = "whole",             # whole | upper | lower
+        out_file: str = "",                         # optional output filename
     ):
         """
         Create a distance matrix between genomes.
@@ -951,7 +1084,7 @@ class WordDB(container.Collection):
                 data=self.copy(),
             )
             if echo:
-                tools.msg(f"✅ Database file {path} with k-mer counts of {len(self)} genomes was syccessfuly saved!")
+                tools.msg(f"✅ Database file {path} with k-mer counts of {len(self)} genomes was successfuly saved!")
         except:
             tools.msg(f"\n❌ Error occures when database file {path} was saving!")
     
@@ -1121,7 +1254,8 @@ class Genome:
         targer_seq_length: int = 0, 
         chunk_number: int = 0, 
         flg_keep_sequence: bool = False, 
-        flg_reset_sequence: bool = False):
+        flg_reset_sequence: bool = False,
+        echo: bool = True):
             
         # Check if sequence reset was requested. self.ATGC is used as a marker that one sequence was processed recently
         if self.ATGC and self.sequence and not flg_reset_sequence:
@@ -1142,11 +1276,12 @@ class Genome:
         for wlength in range(self.min_k,self.max_k + 1):
             self._count_words(sequence=sequence, 
                 wlength=wlength, 
-                flg_progress=True, bar_text="Count "+str(wlength)+"-mers: ")
+                flg_progress=echo, bar_text="Count "+str(wlength)+"-mers: ")
             words = [kmer.split(",") for kmer in self.generate_kmers(min_k=wlength, max_k=wlength)]
             length = len(words)
             
-            bar = progressbar.indicator(length, str(wlength)+"-mers stat: ")
+            if echo:
+                bar = progressbar.indicator(length, str(wlength)+"-mers stat: ")
             counter = 1
             for wl, x, y in words:
                 if not self.has(wl,x,y):
@@ -1154,12 +1289,13 @@ class Genome:
                 count = self.get_kmer_value(wl,x,y)
                 self.add(wl,x,y,count)
                 counter += 1
-                if counter%99 == 0:
+                if echo and counter%99 == 0:
                     try:
                         bar(counter)
                     except:
                         pass
-            bar.stop()
+            if echo:
+                bar.stop()
             
         self.ATGC = {"A":sequence.upper().count("A"),
             "T":sequence.upper().count("T"),
@@ -1172,7 +1308,7 @@ class Genome:
         self,
         min_k: int = 0,
         max_k: int = 0,
-        data_type: str = "digit",           # digit | count | z-score
+        data_type: str = "digit",           # digit | count | z-score | median_centered-z-score
         matrix_geometry: str = "whole",     # whole | upper | lower
         flg_add_kmers: bool = False,
         flg_reverse_complement: bool = False
@@ -1337,110 +1473,208 @@ class Genome:
                 values.append(f"{kmer},{count}")
     
             return values
+            
+        if data_type == "z-score":
+            # ------------------------------------------------------------
+            # Return z-scores of observed k-mer counts compared to expectations
+            # ------------------------------------------------------------
+            values = []
+        
+            # Number of canonical nucleotides A, T, G, and C.
+            seqlength = self.get_seqlength(True)
+        
+            if seqlength <= 0:
+                sys.exit(
+                    "\n❌ The sequence contains no canonical A, T, G, or C "
+                    "nucleotides."
+                )
+            '''
+            # Retain this restriction if it is required by your statistical
+            # model. Note that it becomes very stringent for large k values.
+            min_required_length = 4 ** (2 * max_k)
+        
+            if seqlength < min_required_length:
+                sys.exit(
+                    "\n❌ Sequence length is too short for this calculation! "
+                    f"Sequence length must be at least {min_required_length}; "
+                    f"observed length is {seqlength}."
+                )
+            '''
+            # Cache expectation and standard deviation because all k-mers of
+            # the same length have the same values under the equal-frequency
+            # random-sequence model.
+            current_k = None
+            expectation = 0.0
+            sigma = 0.0
+        
+            for kmer in kmers:
+                parts = kmer.split(",")
+        
+                try:
+                    k, x, y = [int(v) for v in parts[-3:]]
+                except (ValueError, TypeError):
+                    sys.exit(f"\n❌ Cannot parse k-mer record '{kmer}'.")
     
-        # ------------------------------------------------------------
-        # Return z-scores of observed k-mer counts
-        # ------------------------------------------------------------
-        values = []
+                if matrix_geometry.lower() == "upper" and self._is_lower([k, x, y]):
+                    continue
     
-        # Number of canonical nucleotides A, T, G, and C.
-        seqlength = self.get_seqlength(True)
-    
-        if seqlength <= 0:
-            sys.exit(
-                "\n❌ The sequence contains no canonical A, T, G, or C "
-                "nucleotides."
-            )
-    
-        # Retain this restriction if it is required by your statistical
-        # model. Note that it becomes very stringent for large k values.
-        min_required_length = 4 ** (2 * max_k)
-    
-        if seqlength < min_required_length:
-            sys.exit(
-                "\n❌ Sequence length is too short for this calculation! "
-                f"Sequence length must be at least {min_required_length}; "
-                f"observed length is {seqlength}."
-            )
-    
-        # Cache expectation and standard deviation because all k-mers of
-        # the same length have the same values under the equal-frequency
-        # random-sequence model.
-        current_k = None
-        expectation = 0.0
-        sigma = 0.0
-    
-        for kmer in kmers:
-            parts = kmer.split(",")
-    
-            try:
-                k, x, y = [int(v) for v in parts[-3:]]
-            except (ValueError, TypeError):
-                sys.exit(f"\n❌ Cannot parse k-mer record '{kmer}'.")
+                if matrix_geometry.lower() == "lower" and self._is_upper([k, x, y]):
+                    continue    
+        
+                # Recalculate the expected count and standard deviation only
+                # when the k-mer length changes.
+                if k != current_k:
+                    current_k = k
+        
+                    # Number of possible starting positions of a k-mer.
+                    n_positions = seqlength - k + 1
+        
+                    if n_positions <= 0:
+                        sys.exit(
+                            f"\n❌ Sequence length {seqlength} is shorter than "
+                            f"k-mer length {k}."
+                        )
+        
+                    # Under an equal-frequency independent-nucleotide model,
+                    # the probability of a specific k-mer is 1 / 4**k.
+                    expectation = n_positions / (4**k)
+        
+                    # Binomial standard deviation:
+                    #
+                    # sqrt[n * p * (1 - p)]
+                    #
+                    # where n = L-k+1 and p = 1/4**k.
+                    sigma = np.sqrt(
+                        n_positions
+                        * (4**k - 1)
+                        / (4 ** (2 * k))
+                    )
+        
+                # Retrieve the observed count; use zero if the k-mer is absent.
+                if flg_reverse_complement:
+                    count = (
+                        self.word_counts
+                        .get(k, {})
+                        .get("x", {})
+                        .get(y, {})
+                        .get(x, 0)
+                    )
+                else:
+                    count = (
+                        self.word_counts
+                        .get(k, {})
+                        .get("x", {})
+                        .get(x, {})
+                        .get(y, 0)
+                    )
+        
+                # sigma should be positive when n_positions > 0, but this
+                # check prevents an accidental division by zero.
+                if sigma == 0:
+                    z_score = 0.0
+                else:
+                    z_score = (count - expectation) / sigma
+        
+                values.append(f"{kmer},{z_score}")
+        
+            return values
 
-            if matrix_geometry.lower() == "upper" and self._is_lower([k, x, y]):
-                continue
-
-            if matrix_geometry.lower() == "lower" and self._is_upper([k, x, y]):
-                continue    
-    
-            # Recalculate the expected count and standard deviation only
-            # when the k-mer length changes.
-            if k != current_k:
-                current_k = k
-    
-                # Number of possible starting positions of a k-mer.
-                n_positions = seqlength - k + 1
-    
-                if n_positions <= 0:
+        if data_type == "median_centered-z-score":
+            # ------------------------------------------------------------
+            # Return median-centered z-scores of observed k-mer counts
+            # ------------------------------------------------------------
+            values = []
+            
+            seqlength = self.get_seqlength(True)
+            
+            if seqlength <= 0:
+                sys.exit(
+                    "\n❌ The sequence contains no canonical A, T, G, or C "
+                    "nucleotides."
+                )
+            
+            # ------------------------------------------------------------
+            # 1. Collect counts, grouped by k
+            # ------------------------------------------------------------
+            records = {}
+            
+            for kmer in kmers:
+                parts = kmer.split(",")
+            
+                try:
+                    k, x, y = [int(v) for v in parts[-3:]]
+                except (ValueError, TypeError):
+                    sys.exit(f"\n❌ Cannot parse k-mer record '{kmer}'.")
+            
+                if matrix_geometry.lower() == "upper" and self._is_lower([k, x, y]):
+                    continue
+            
+                if matrix_geometry.lower() == "lower" and self._is_upper([k, x, y]):
+                    continue
+            
+                if seqlength - k + 1 <= 0:
                     sys.exit(
                         f"\n❌ Sequence length {seqlength} is shorter than "
                         f"k-mer length {k}."
                     )
-    
-                # Under an equal-frequency independent-nucleotide model,
-                # the probability of a specific k-mer is 1 / 4**k.
-                expectation = n_positions / (4**k)
-    
-                # Binomial standard deviation:
-                #
-                # sqrt[n * p * (1 - p)]
-                #
-                # where n = L-k+1 and p = 1/4**k.
+            
+                if flg_reverse_complement:
+                    count = (
+                        self.word_counts
+                        .get(k, {})
+                        .get("x", {})
+                        .get(y, {})
+                        .get(x, 0)
+                    )
+                else:
+                    count = (
+                        self.word_counts
+                        .get(k, {})
+                        .get("x", {})
+                        .get(x, {})
+                        .get(y, 0)
+                    )
+            
+                records.setdefault(k, []).append((kmer, count))
+            
+            
+            # ------------------------------------------------------------
+            # 2. Calculate z-scores independently for every k
+            # ------------------------------------------------------------
+            for k, items in records.items():
+            
+                counts = np.asarray(
+                    [count for _, count in items],
+                    dtype=float
+                )
+            
+                # Median of the complete k-mer count distribution.
+                median = np.median(counts)
+            
+                # Standard deviation calculated around the median,
+                # rather than around the mean.
                 sigma = np.sqrt(
-                    n_positions
-                    * (4**k - 1)
-                    / (4 ** (2 * k))
+                    np.mean((counts - median) ** 2)
                 )
-    
-            # Retrieve the observed count; use zero if the k-mer is absent.
-            if flg_reverse_complement:
-                count = (
-                    self.word_counts
-                    .get(k, {})
-                    .get("x", {})
-                    .get(y, {})
-                    .get(x, 0)
-                )
-            else:
-                count = (
-                    self.word_counts
-                    .get(k, {})
-                    .get("x", {})
-                    .get(x, {})
-                    .get(y, 0)
-                )
-    
-            # sigma should be positive when n_positions > 0, but this
-            # check prevents an accidental division by zero.
-            if sigma == 0:
-                z_score = 0.0
-            else:
-                z_score = (count - expectation) / sigma
-    
-            values.append(f"{kmer},{z_score}")
-    
-        return values
+            
+                if sigma == 0:
+                    z_scores = np.zeros(len(counts), dtype=float)
+            
+                else:
+                    # Median-centered scores.
+                    z_scores = (counts - median) / sigma
+            
+                    # Force the complete distribution to have mean 0.
+                    # Consequently sum(z_scores) ~= 0.
+                    z_scores -= np.mean(z_scores)
+            
+                for (kmer, _), z_score in zip(items, z_scores):
+                    values.append(f"{kmer},{z_score}")
+            
+            
+            return values
+
+        sys.exit(f"ERROR: Requested unknown data type {data_type}!")
             
     # Return a substring of values [min_k..max_k]
     def get_string_subset(self, min_k: int = 0, max_k: int = 0):
@@ -1655,17 +1889,18 @@ class Genome:
                 f"\n❌ The requested k-mer range [{min_k}..{max_k}] exceeds the available k-mer range [{self.min_k}..{self.max_k}]!"
             )
         
-    def get_distance(self, other, distance: str = "hamming", flg_reverse_complement: bool = False):
+    def get_distance(self, other, distance: str = "hamming", data_type: str = "median_centered-z-score", flg_reverse_complement: bool = False):
         if distance.lower() == "hamming":
             return self._hamming_distance(other, flg_reverse_complement)
         elif distance.lower() == "euclidean":
-            return self._euclidean_distance(other, flg_reverse_complement)
+            # data_type = count | z-score | median_centered-z-score
+            return self._euclidean_distance(other, flg_reverse_complement, data_type=data_type)
         elif distance.lower() == "rank":
             return self._rank_distance(other, flg_reverse_complement)
         else:
             sys.exit(f"\n❌ Unrecognized distance type {distance}!")
                 
-    def gc_content(self, digits: int = 0):
+    def get_gc_content(self, digits: int = 0):
         """
         Calculate the GC-content of the sequence.
     
@@ -1692,7 +1927,7 @@ class Genome:
             return gc_cont
         return f"{gc_cont:.{digits}f}"
         
-    def gc_skew(self, digits: int = 0):
+    def get_gc_skew(self, digits: int = 0):
         """
         Calculate the GC-skew of the sequence.
     
@@ -1722,7 +1957,7 @@ class Genome:
     
         return f"{skew:.{digits}f}"
         
-    def purine_skew(self, digits: int = 0):
+    def get_purine_skew(self, digits: int = 0):
         """
         Calculate the purine-skew of the sequence.
     
@@ -2002,7 +2237,7 @@ class Genome:
             return True
         return False
 
-    def _euclidean_distance(self, other, flg_reverse_complement: bool = False):
+    def _euclidean_distance(self, other, data_type: str = "median_centered-z-score", flg_reverse_complement: bool = False):     # data_type = count | z-score | median_centered-z-score
         if not isinstance(other, Genome):
             raise TypeError(
                 f"Unsupported operand type '{type(other).__name__}' "
@@ -2018,12 +2253,12 @@ class Genome:
         # returned for each k-mer.
         a = [
             float(record.split(",")[-1])
-            for record in self.get_values(data_type="z-score")
+            for record in self.get_values(data_type=data_type)
         ]
     
         b = [
             float(record.split(",")[-1])
-            for record in other.get_values(data_type="z-score")
+            for record in other.get_values(data_type=data_type)
         ]
     
         # This should normally be guaranteed by the equal k-mer ranges,

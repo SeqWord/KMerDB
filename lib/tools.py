@@ -70,12 +70,11 @@ def saveDBFile(data,
 
     return str(path)
 
-def saveTextFile(strText,fname=None):
-    if not fname:
-        fname = asksaveasfilename([("Text file", "*.txt"),("Text file", "*.out")])
-    if not fname:
-        return
-    with open(fname, "w") as ofp:
+def saveTextFile(strText: str, fname: str | None = None, flg_append: bool = False):
+    mode = "w"
+    if flg_append:
+        mode = "a"
+    with open(fname, mode) as ofp:
         ofp.write(strText)
         ofp.flush()
     return fname
@@ -91,6 +90,84 @@ def openTextFile(fname=None):
         return data
     except:
         return
+
+def deplete_sequence(
+    sequence: str,
+    chunk_number: int,
+    min_chunk_length: int,
+    max_chunk_length: int
+) -> list[str]:
+    """
+    Extract randomly located fragments from a sequence.
+
+    Fragment lengths are selected randomly between min_chunk_length and
+    max_chunk_length, inclusive. If a fragment extends beyond the end of
+    the sequence, it continues from the beginning of the sequence.
+
+    Parameters
+    ----------
+    sequence : str
+        Source sequence.
+
+    chunk_number : int
+        Number of fragments to generate.
+
+    min_chunk_length : int
+        Minimum fragment length.
+
+    max_chunk_length : int
+        Maximum fragment length.
+
+    Returns
+    -------
+    list[str]
+        Randomly selected sequence fragments.
+    """
+    if not isinstance(sequence, str):
+        raise TypeError("sequence must be a string")
+
+    if not sequence:
+        raise ValueError("sequence cannot be empty")
+
+    if chunk_number < 0:
+        raise ValueError("chunk_number cannot be negative")
+
+    if min_chunk_length <= 0:
+        raise ValueError("min_chunk_length must be greater than zero")
+
+    if max_chunk_length < min_chunk_length:
+        raise ValueError(
+            "max_chunk_length must be greater than or equal to "
+            "min_chunk_length"
+        )
+
+    sequence_length = len(sequence)
+    fragments = []
+
+    for _ in range(chunk_number):
+        start = random.randrange(sequence_length)
+
+        if min_chunk_length == max_chunk_length:
+            chunk_length = min_chunk_length
+        else:
+            chunk_length = random.randint(
+                min_chunk_length,
+                max_chunk_length
+            )
+
+        # Repeat the sequence sufficiently to support fragments longer
+        # than the source sequence and fragments crossing its end.
+        required_length = start + chunk_length
+        repeat_number = (
+            required_length + sequence_length - 1
+        ) // sequence_length
+
+        circular_sequence = sequence * repeat_number
+        fragment = circular_sequence[start:start + chunk_length]
+
+        fragments.append(fragment)
+
+    return fragments
 
 def openSeqFile(fname, concatenate = True, delimiter = 50 * "N"):
     # Parsing lineage informations

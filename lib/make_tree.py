@@ -11,7 +11,9 @@ from spectra import spectral_analysis as spa
 def execute(path: str, 
     min_k: int = 0, 
     max_k: int = 0,
-    algorithm: str = "SPECTRAL",          # NJ | UPGMA | SPECTRAL | "" - return value matrix (v_matrix)
+    algorithm: str = "SPECTRAL",                # NJ | UPGMA | SPECTRAL | "" - return value matrix (v_matrix)
+    distance_type: str = "hamming",             # hamming | rank | euclidean
+    data_type: str = "median_centered-z-score", # count | z-score | median_centered-z-score
     output_file: str = "",
     output_format: str = "",
     max_cluster_number: int = 5, max_cluster_content: int = 5, 
