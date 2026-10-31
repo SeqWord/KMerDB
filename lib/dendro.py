@@ -1,4 +1,4 @@
-import os
+import os, copy
 from functools import reduce
 from typing import Optional, List, Dict
 import numpy as np
@@ -276,6 +276,7 @@ class Node:
             Ordered by ('FDR p-value', 'p-value') ascending.
         self.classifier["NN"] : NN_model
         """
+        
         if not self.classifier["DTree"]:
             raise ValueError(f"Node {self.title} has no classifier!")
         
@@ -288,7 +289,10 @@ class Node:
         for item in self.classifier["DTree"]:
             title = item['title']
             word = title.split("|")[0]
-            dtree_log.append("\t".join([word] + [f"{float(ls[1]):.2f}" for ls in item['groups']]))
+            
+            groups = [ls for ls in item['groups']]
+                
+            dtree_log.append("\t".join([word] + [f"{float(ls[1]):.2f}" for ls in groups]))
             
             # Calculate counts of the direct and reverse complement word
             count_dir = tools.count_word(seq, word)
@@ -309,7 +313,7 @@ class Node:
             markers.append([title, abundance])
             for i in range(len(species)):
                 title = species[i]
-                value_match = (4 - int(abs(float(item['groups'][i][1]) - abundance)))
+                value_match = (4 - int(abs(float(groups[i][1]) - abundance)))
                 matrix[i][title] += value_match
                 dtree_log[-1] += f"\t{value_match}"
         

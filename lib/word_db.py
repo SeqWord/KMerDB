@@ -2241,32 +2241,7 @@ class Genome:
         return "".join(pieces)
 
     def _transform_to_digital_value(self, wlength: int, count: int, seqlength: int, binary_code: bool = False, coding: list = []):
-        thresholds = {
-            2: [48840, 68125, 76837],
-            3: [16122, 21025, 24081],
-            4: [3165, 4747, 5986],
-            5: [820, 1173, 1638],
-            6: [178, 278, 410],
-            7: [41.0, 66.8, 104.7],
-            8: [9.1, 15.7, 26.3],
-            9: [2.1, 3.85, 6.74],
-            10: [0.5752, 1.0286, 1.9521],
-            11: [0.28756, 0.41772, 0.683],
-        }
-        
-        f = 1000000 * count / seqlength
-        
-        level = 3
-        for i in range(3):
-            if f <= thresholds[wlength][i]:
-                level = i
-                break
-        if binary_code:
-            values = ["000", "001", "011", "111"]
-            return values[level]
-        if coding and len(coding) == 4:
-            return coding[level]
-        return level
+        return tools.set_value(wlength=wlength, count=count, seqlength=seqlength, binary_code=binary_code, coding=coding)
         
     def _reverse_complement_kmer(self, kmer: list | str):   # kmer = k,x,y or word,k,x,y
         is_string = False
