@@ -5,7 +5,7 @@ Machine-learning pipeline for taxonomic classification and binning of DNA fragme
 
 A machine-learning pipeline for taxonomic identification of DNA sequences using genome-specific k-mer frequency patterns.
 
-The pipeline converts reference genomes into k-mer frequency databases, clusters related genomes, identifies informative k-mers, trains hierarchical classifiers, generates synthetic sequencing reads for validation, and classifies unknown reads.
+The pipeline converts reference genomes into k-mer frequency databases, clusters related genomes, identifies informative k-mers, trains hierarchical classifiers, generates synthetic sequencing reads for validation, classifies unknown reads, and evaluates classifier performance.
 
 ---
 
@@ -31,6 +31,9 @@ Reference genomes (.gbk/.gb/.gbf)
               │
               ▼
 6. Classify unknown reads
+              │
+              ▼
+7. Evaluate classifier performance
 ```
 
 ---
@@ -270,6 +273,50 @@ Classifies unknown sequencing reads using the decision-tree model generated in S
 
 ---
 
+# Step 7 — Evaluate Classifier Performance
+
+**Program**
+
+```
+7.Classifier_performance/performance_stat.py
+```
+
+**Example**
+
+```bash
+cd 7.Classifier_performance
+python performance_stat.py -d model.pkl -r test_reads.fasta -p project --taxonomic_level species
+```
+
+### Purpose
+
+Evaluates species- or genus-level identification performance on test reads with known taxonomic origins. Repeats classification across specified accuracy and specificity thresholds, calculates TP, FP, TN, FN, precision, recall, F1 score, specificity, and balanced accuracy, and saves summary tables and PNG performance/ROC plots. Two progress bars track the accuracy and specificity sweeps.
+
+### Required arguments
+
+| Argument | Description |
+|----------|-------------|
+| `-d`, `--db_file` | Trained classifier model (.pkl) |
+| `-r`, `--reads` | Test FASTA/FASTQ reads with taxon names in sequence titles |
+
+### Main optional arguments
+
+| Argument | Default |
+|----------|---------|
+| `-i`, `--input` | input |
+| `-o`, `--output` | output |
+| `-f`, `--db_folder` | db |
+| `-p`, `--project` | automatic |
+| `--taxonomic_level` | species (`species` / `genus`) |
+| `--accuracy_min`, `--accuracy_max`, `--accuracy_step` | 0.60, 0.70, 0.05 |
+| `--specificity_min`, `--specificity_max`, `--specificity_step` | 0.80, 0.90, 0.02 |
+| `-m`, `--min_read_length` | 5000 |
+| `-x`, `--max_read_length` | unlimited |
+| `-n`, `--use_NN` | True |
+| `-e`, `--entropy_cutoff` | 0.5 |
+
+---
+
 # Pipeline Summary
 
 | Step | Description |
@@ -280,6 +327,7 @@ Classifies unknown sequencing reads using the decision-tree model generated in S
 | **4** | Select informative k-mers and train classifiers |
 | **5** | Generate pseudo-reads |
 | **6** | Classify unknown reads |
+| **7** | Evaluate species/genus classification performance across threshold settings |
 
 ---
 
@@ -292,6 +340,7 @@ Classifies unknown sequencing reads using the decision-tree model generated in S
 4.kmer_selector/
 5.read_generator/
 6.Classifier/
+7.Classifier_performance/
 ```
 
 Each module can be executed independently, while together they form a complete pipeline for k-mer-based taxonomic identification.
