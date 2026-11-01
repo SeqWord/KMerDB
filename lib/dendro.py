@@ -423,6 +423,9 @@ class EndNode(Node):                            # End or terminal node of the tr
 
     def get_lineage(self):
         return self.lineage
+        
+    def get_leaves(self):
+        return [ls[0] for ls in self.classifier["DTree"][0]['groups']]
 
     # Edit nodes
     def rename(self,new_name):
@@ -701,9 +704,13 @@ class Root(Intermediate_Node):                      # Root of the tree
     def get_endnode_titles(self):
         return self.terminals.get_titles()
         
-    def get_endnode_qualifiers(self):
-        return tools.dereplicate(reduce(lambda ls1,ls2: ls1+ls2, list(map(lambda oEndNode: list(oEndNode.qualifiers.keys()), self.terminals))))
+    def get_leaf_titles(self) -> list[str]:
+        return sorted(set().union(*(node.get_leaves() for node in self.terminals)))
         
+                
+    def get_endnode_qualifiers(self) -> list[str]:
+        return sorted(set().union(*(node.qualifiers for node in self.terminals)))
+                
     def get_lineage_titles(self,flg_sort=False):
         if flg_sort and len(self.lineages) > 1:
             self.lineages.sort()
