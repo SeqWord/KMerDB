@@ -266,8 +266,8 @@ Classifies unknown sequencing reads using the decision-tree model generated in S
 | `-p`, `--project` | automatic |
 | `-m`, `--min_read_length` | 5000 |
 | `-x`, `--max_read_length` | unlimited |
-| `-a`, `--accuracy` | 0.65 |
-| `-s`, `--specificity` | 0.8 |
+| `-a`, `--accuracy` | 0.6  |
+| `-s`, `--specificity` | 0.78 |
 | `-n`, `--use_NN` | True |
 | `-e`, `--entropy_cutoff` | 0.5 |
 
@@ -309,7 +309,7 @@ Evaluates species- or genus-level identification performance on test reads with 
 | `-p`, `--project` | automatic |
 | `--taxonomic_level` | species (`species` / `genus`) |
 | `--accuracy_min`, `--accuracy_max`, `--accuracy_step` | 0.60, 0.70, 0.05 |
-| `--specificity_min`, `--specificity_max`, `--specificity_step` | 0.80, 0.90, 0.02 |
+| `--specificity_min`, `--specificity_max`, `--specificity_step` | 0.70, 0.90, 0.02 |
 | `-m`, `--min_read_length` | 5000 |
 | `-x`, `--max_read_length` | unlimited |
 | `-n`, `--use_NN` | True |

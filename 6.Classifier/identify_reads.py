@@ -116,8 +116,8 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--project", default="", help="Optional project name (default: '')")
     parser.add_argument("-m", "--min_read_length", type=int, default=5000, help="Minimal read length (default: 5000)")
     parser.add_argument("-x", "--max_read_length", type=int, default=0,    help="Maximal read length (default: 0)")
-    parser.add_argument("-a", "--accuracy",   type=float, default=0.5, help="Border value to select intermediate splits (default: 0.65)")
-    parser.add_argument("-s", "--specificity", type=float, default=0.7,  help="Border value for species identification (default: 0.8)")
+    parser.add_argument("-a", "--accuracy",   type=float, default=0.6, help="Border value to select intermediate splits (default: 0.6)")
+    parser.add_argument("-s", "--specificity", type=float, default=0.78,  help="Border value for species identification (default: 0.78)")
     parser.add_argument("-n", "--use_NN", type=tools.str2bool, choices=["T", "t", "F", "f", "Y", "y", "N", "n"], default=True)
     parser.add_argument("-e", "--entropy_cutoff", type=float, default=0.5,  help="Top cutoff entropy value for accepting NN classification (default: 0.5)")
     

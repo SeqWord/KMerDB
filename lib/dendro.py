@@ -1051,6 +1051,15 @@ class Root(Intermediate_Node):                      # Root of the tree
             log += log_record
             log.append("*" * 10)
             
+            # Normalize a single prediction record to a list of records
+            if (
+                isinstance(species, (list, tuple))
+                and len(species) == 4
+                and isinstance(species[0], str)
+                and isinstance(species[3], bool)
+            ):
+                species = [list(species)]
+                
             if len(species) and any([ls[3] for ls in species]):
                 log.append(f"Identified as: {species[0][0]} with identity {species[0][1]}")
                 species.sort(key=lambda sp: float(sp[1]), reverse=True)
